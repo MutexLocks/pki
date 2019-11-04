@@ -2,19 +2,26 @@ package com.g.pki.service.impl;
 
 import com.g.pki.model.X509;
 import com.g.pki.service.CertificateService;
+import com.sun.org.apache.xml.internal.security.keys.keyresolver.implementations.X509SubjectNameResolver;
+import org.bouncycastle.asn1.pkcs.CertificationRequestInfo;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.asn1.x509.X509Extensions;
 import org.bouncycastle.asn1.x509.X509Name;
+import org.bouncycastle.jce.PKCS10CertificationRequest;
 import org.bouncycastle.jce.X509Principal;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.PEMReader;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.math.BigInteger;
 import java.security.*;
+
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Calendar;
@@ -24,6 +31,7 @@ import java.util.Vector;
 
 @Service
 public class CertificateServiceImpl implements CertificateService {
+    private Logger LOG = LoggerFactory.getLogger(CertificateServiceImpl.class);
     /**
      *BouncyCastleProvider
      */
@@ -40,49 +48,30 @@ public class CertificateServiceImpl implements CertificateService {
 
     @SuppressWarnings({"deprecation", "unchecked"})
 
-    public byte[] generateCert(X509 x509) {
+    public byte[] generateCert(String csrCode) {
 
         X509Certificate cert = null;
-
         X509V3CertificateGenerator certGen = new X509V3CertificateGenerator();
 
         try {
 
             // 生成RSA公私钥对
-
             KeyPairGenerator kpg = null;
-
             // 采用 RSA 非对称算法加密
-
             kpg = KeyPairGenerator.getInstance("RSA");
-
-
             // 初始化为2048 位
-
             kpg.initialize(2048);
-
-
             KeyPair keyPair = kpg.generateKeyPair();
-
             // 公钥
-
             PublicKey pubKey = keyPair.getPublic();
-
             // 私钥
-
             PrivateKey priKey = keyPair.getPrivate();
-
-
             // 公钥
-
             certGen.setPublicKey(pubKey);
-
             // 设置序列号
-
             certGen.setSerialNumber(new BigInteger("12345678"));
 
             // 设置颁发者信息
-
             Hashtable kwMapIssuer = new Hashtable();
 
             Vector localVector = new Vector();
@@ -100,30 +89,28 @@ public class CertificateServiceImpl implements CertificateService {
             localVector.addElement(X509Principal.E);
 
             certGen.setIssuerDN(new X509Principal(localVector, kwMapIssuer));
-
             //  设置申请者信息
 
-            @SuppressWarnings("rawtypes")
-
-            Hashtable kwMapApplicant = new Hashtable();
-
-            @SuppressWarnings("rawtypes")
-
-            Vector localVectorApplicant = new Vector();
-
-            kwMapApplicant.put(X509Principal.C, "CN");
-
-            localVectorApplicant.addElement(X509Principal.C);
-
-            kwMapApplicant.put(X509Principal.CN, "wlhl");
-
-            localVectorApplicant.addElement(X509Principal.CN);
-
-            kwMapApplicant.put(X509Principal.E, "123@qq.com");
-
-            localVectorApplicant.addElement(X509Principal.E);
-
-            certGen.setSubjectDN(new X509Principal(localVectorApplicant, kwMapApplicant));
+//            @SuppressWarnings("rawtypes")
+//
+//            Hashtable kwMapApplicant = new Hashtable();
+//
+//            @SuppressWarnings("rawtypes")
+//
+//            Vector localVectorApplicant = new Vector();
+//
+//            kwMapApplicant.put(X509Principal.C, "CN");
+//
+//            localVectorApplicant.addElement(X509Principal.C);
+//
+//            kwMapApplicant.put(X509Principal.CN, "wlhl");
+//
+//            localVectorApplicant.addElement(X509Principal.CN);
+//
+//            kwMapApplicant.put(X509Principal.E, "123@qq.com");
+//
+//            localVectorApplicant.addElement(X509Principal.E);
+            certGen.setSubjectDN(parseCSRtoX509(csrCode));
 
             // 设置有效期
 
@@ -152,8 +139,11 @@ public class CertificateServiceImpl implements CertificateService {
         }
 
         try {
-
-            return cert.getEncoded();
+            if (cert != null) {
+                writeFile(cert.getEncoded());
+                return cert.getEncoded();
+            }
+            return null;
 
         } catch (CertificateEncodingException e) {
 
@@ -167,39 +157,62 @@ public class CertificateServiceImpl implements CertificateService {
 
     }
 
+    private X509Name parseCSRtoX509(String csrCode) throws IOException {
+
+//        String csrCode = "-----BEGIN CERTIFICATE REQUEST-----\n" +
+//                "MIICxTCCAa0CAQAwgYExFzAVBgNVBAMMDid3d3cudGVzdC5jb20nMREwDwYDVQQKDAgnYW5oZW5nJzEMMAoGA1UEBwwDJzMnMQ0wCwYDVQQGEwQnQ04nMRkwFwYJKoZIhvcNAQkBFgonN0BxcS5jb20nMQwwCgYDVQQLDAMnMicxDTALBgNVBAgMBCd6aicwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCl+T+LJgaqfyq2z9UHUJYn3+GDd6dLSkqSKrPgfFG7dI4ZSMCxtSrce6X145yYgd0s2DJMHuK1nHmJ7uSbwSLIV83p3spVuemN8zLAAgQounhYbt8i+/CLPxr7GY/z4htfVRcDt3C//7Hs52zZvZPDeE1gaADrgsdI+yfFvJq4pdBnL2M2tM1fqRdqg64kfZjY/rRlR88igr1kkp+A+a5aVQpWHsD2ecghIBDrLTKHldfcg9jN+0VMcRftTRqqcmYT4wSDWNTsay7IkPx9VtX/YKmrKvSEUxZWrtpYIqbTgg0BNPNVSfu9Fnjpal9aknIWzPBM4vMbZZtE47JLLolhAgMBAAEwDQYJKoZIhvcNAQEFBQADggEBAEOE2fSnlzzQZiF+qM1eETwJx9m4b9D6cgyFhf01JAtYtIpV7G+NysG7BinZLG6tvYZWCtMTv40v7n77P2EF30EeIaKSt7Ugf9r/jt1gF9ix7z1pdY0QubWiq6XygT1VUNSFHyrbE8xH2Nmj/Ltfefv4c+yvAiwLQelFzg4w4/BLgZHFEvFTkd3PJtccYatzmXzcu/A0nFY1gc8EyFH9itKPr/bARXvm4sY+6jVKNfU8KmA6Hqo66rNZkrgXrbcB7HpCWAVVtfQERkV30uf2uYdviKDqnDQa1sVkk21X1tUx390Dp2r7TQpsyDU3WfB/cIbltcFxr4tngtvrRkbXTUc=\n" +
+//                "-----END CERTIFICATE REQUEST-----\n";
+        Reader reader = new StringReader(csrCode);
+        PEMReader pem = new PEMReader(reader);
+
+        PKCS10CertificationRequest csr = (PKCS10CertificationRequest) pem.readObject();
+        //PKCS10CertificationRequest csr = convertPemToPKCS10CertificationRequest(csrStream);
+        String compname = null;
+        X509Name x509Name = null;
+        if (csr == null) {
+            LOG.warn("fail to parse csrcode to x509name");
+        } else {
+            CertificationRequestInfo certificationRequestInfo = csr.getCertificationRequestInfo();
+            x509Name = certificationRequestInfo.getSubject();
+            //System.out.println("x509Name is: " + x509Name + "\n");
+        }
+        return x509Name;
+    }
+
     /**
      * 写文件
      *
-     * @param name
      * @param data
      */
 
-//    private void writeFile(String name, byte[] data) {
-//
-//        if (data == null) {
-//
-//            return;
-//
-//        }
-//
-//        FileOutputStream fop = null;
-//
-//        try {
-//
-//            fop = new FileOutputStream(new File(name));
-//
-//            fop.write(data);
-//
-//            fop.close();
-//
-//        } catch (IOException e) {
-//
-//            // TODO Auto-generated catch block
-//
-//            e.printStackTrace();
-//
-//        }
-//    }
+    @Value("${cert.save.path}")
+    private String certPath;
+    private void writeFile(byte[] data) {
+
+        if (data == null) {
+
+            return;
+
+        }
+
+        FileOutputStream fop = null;
+
+        try {
+
+            fop = new FileOutputStream(new File(certPath));
+
+            fop.write(data);
+
+            fop.close();
+
+        } catch (IOException e) {
+
+            // TODO Auto-generated catch block
+
+            e.printStackTrace();
+
+        }
+    }
 
 //    public static void main(String[] args) {
 //
