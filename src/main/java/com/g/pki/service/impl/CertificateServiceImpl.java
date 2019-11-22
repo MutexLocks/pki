@@ -1,6 +1,6 @@
 package com.g.pki.service.impl;
 
-import com.g.pki.model.X509;
+
 import com.g.pki.service.CertificateService;
 import com.sun.org.apache.xml.internal.security.keys.keyresolver.implementations.X509SubjectNameResolver;
 import org.bouncycastle.asn1.pkcs.CertificationRequestInfo;
@@ -46,6 +46,9 @@ public class CertificateServiceImpl implements CertificateService {
      * @return
      */
 
+    private String issuerCSR = "-----BEGIN CERTIFICATE REQUEST-----\n" +
+            "MIICxzCCAa8CAQAwgYMxFzAVBgNVBAMMDid3d3cudGVzdC5jb20nMREwDwYDVQQKDAgnYW5oZW5nJzENMAsGA1UEBwwEJ2h6JzENMAsGA1UEBhMEJ0NOJzEZMBcGCSqGSIb3DQEJARYKJzFAcXEuY29tJzENMAsGA1UECwwEJ2RwJzENMAsGA1UECAwEJ2h6JzCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAI+6etMba7tLNJmEM1jtO+J+/goykNH5Xxy0SGSgBXyIvIbFThMcGCCs0RL6jiYH2iPzt17qjRUyMimOYZEoCZHxqrp/d2tgBCyVu3TjxR7L6JRj9WOS5+c+dYCPmj8Kk7nzaa3fTnXeATOhpotfkOArmM1OX3MpviCMmAOf2vYGULncmhLdD97GSXYldtKsTA51z6YSzN8WhCLeh3UHnQ3dEC1/98Hmamef7LqNsAtiVgR2B9UqL2YCuMQO0kxrD5+mq3To0KFoHOA78zvpYLE4Gq7mUjpixmwoWIlxQF3kjlc6VfA9LVjYrzfwpI+iGPYvz8/NXiyovxfvkF5v9vMCAwEAATANBgkqhkiG9w0BAQUFAAOCAQEAPL0AQDxqYrGayTGx7uLfNxPm9aTgITndbJyjA94WdFlW1DR3JUzVSzyIUbjv4uKVnedXRjVLvt8ksRpEK48kblsXNrniZovGs87CCb8SGbrBQiUr3XoedUWAIMMjaeUy1oc/T7Wnnhx/aHUxXzH2IPOi5e4UBGnS50YImZ+nsCfhJaLCm02IfZmXQYiaXMAAq4aa/sxGSUiKwZTMA5H3zG2ECDy3aMzxNpjPnNARGTF1in0EiTcp7wEVDbTfJrqTd3aqYEydyY/L/Dfv3d8gc9iI/bsMRCDRmG6sPT0pA+PqCOlG1V4lBS+EIgzGJckeTt/E5ZJa+cK0cBMm39pIgw==\n" +
+            "-----END CERTIFICATE REQUEST-----";
     @SuppressWarnings({"deprecation", "unchecked"})
 
     public byte[] generateCert(String csrCode) {
@@ -72,23 +75,23 @@ public class CertificateServiceImpl implements CertificateService {
             certGen.setSerialNumber(new BigInteger("12345678"));
 
             // 设置颁发者信息
-            Hashtable kwMapIssuer = new Hashtable();
+//            Hashtable kwMapIssuer = new Hashtable();
+//
+//            Vector localVector = new Vector();
+//
+//            kwMapIssuer.put(X509Principal.C, "CN");
+//
+//            localVector.addElement(X509Principal.C);
+//
+//            kwMapIssuer.put(X509Principal.CN, "www.test.com");
+//
+//            localVector.addElement(X509Principal.CN);
+//
+//            kwMapIssuer.put(X509Principal.E, "111@qq.com");
+//
+//            localVector.addElement(X509Principal.E);
 
-            Vector localVector = new Vector();
-
-            kwMapIssuer.put(X509Principal.C, "CN");
-
-            localVector.addElement(X509Principal.C);
-
-            kwMapIssuer.put(X509Principal.CN, "wuwu");
-
-            localVector.addElement(X509Principal.CN);
-
-            kwMapIssuer.put(X509Principal.E, "111@qq.com");
-
-            localVector.addElement(X509Principal.E);
-
-            certGen.setIssuerDN(new X509Principal(localVector, kwMapIssuer));
+            certGen.setIssuerDN(parseCSRtoX509(issuerCSR));
             //  设置申请者信息
 
 //            @SuppressWarnings("rawtypes")
@@ -174,6 +177,7 @@ public class CertificateServiceImpl implements CertificateService {
         } else {
             CertificationRequestInfo certificationRequestInfo = csr.getCertificationRequestInfo();
             x509Name = certificationRequestInfo.getSubject();
+
             //System.out.println("x509Name is: " + x509Name + "\n");
         }
         return x509Name;
