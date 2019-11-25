@@ -41,19 +41,16 @@ public class CertificateController {
     @PostMapping("/cert")
     public ResponseEntity<InputStreamResource> getCertificate(String csrCode) throws IOException {
 
-        certificateService.generateCert(csrCode);
-
+        String fileName = certificateService.generateCert(csrCode);
 
         HttpHeaders headers = new HttpHeaders();
-        headers.add("Content-Disposition", "attachment; filename=a.cer");
+        headers.add("Content-Disposition", "attachment; filename=" + fileName + ".cer");
 
-        InputStream in = new FileInputStream(certPath);
+        InputStream in = new FileInputStream(certPath + fileName + ".cer");
         return ResponseEntity
                 .ok()
                 .headers(headers)
                 .body(new InputStreamResource(in));
-
-
         //return "auto";
     }
 //    @GetMapping("/csr")

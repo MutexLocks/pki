@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org/DTD Mapper 3.0" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.g.pki.dao.CertificateDao">
+
+
+<!--    private String id;-->
+<!--    private String path;-->
+<!--    private String fileName;-->
+<!--    private Date create_time;-->
+<!--    private Date update_time;-->
+    <resultMap type="Certificate" id="certificateInfo">
+        <id property="id" column="id" />
+        <result property="name" column="f_name" />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+    <!-- id要与接口方法名相同 -->
+    <!-- SQL语句中的参数名称（#{id}），要与java代码中的参数bean的数据字段相同，这里是UserInfo.id字段 -->
+    <!-- type属性可省略 -->
+    <insert id="generateCertSerialNumber" parameterType="com.g.pki.model.Certificate" useGeneratedKeys="true" keyProperty="id" >
+        insert into cert_serial_number (tmp) value (1);
+    </insert>
+
+<!--    &lt;!&ndash; @Param的参数必须与#{}中的参数一致 &ndash;&gt;-->
+<!--    <insert id="insertUserInfo">-->
+<!--        insert into t_user (f_id,f_name,f_birth,f_salary) values (#{id},#{name},#{birth},#{salary})-->
+<!--    </insert>-->
+
+<!--    <insert id="insertUserInfoByBatch">-->
+<!--        insert into t_user (f_id,f_name,f_birth,f_salary) values-->
+<!--        <foreach collection="list" item="item" separator="," index="idx">-->
+<!--            (#{idx},#{item.name},#{item.birth},#{item.salary})-->
+<!--        </foreach>-->
+<!--    </insert>-->
+
+<!--    &lt;!&ndash;resultMap属性的值是 resultMap配置节id的值。当承载返回结果的java bean数据字段与数据库表字段格式不一致时，使用resultMap &ndash;&gt;-->
+<!--    &lt;!&ndash; 如果返回多行数据，会用list封装UserData &ndash;&gt;-->
+<!--    <select id="listUserInfo" resultMap="userData">-->
+<!--        select * from t_user-->
+<!--    </select>-->
+
+<!--    <select id="getUserCount" resultType="int">-->
+<!--        select count(*) from-->
+<!--        t_user-->
+<!--    </select>-->
+
+<!--    <select id="listUserInfoToMap" resultType="map">-->
+<!--        select * from-->
+<!--        t_user-->
+<!--    </select>-->
+
+<!--    <select id="getUserInfoById" resultMap="userData">-->
+<!--        select * from t_user-->
+<!--        where f_id = #{id}-->
+<!--    </select>-->
+
+<!--    <select id="getUserInfoToMap" resultType="hashmap">-->
+<!--        select * from t_user-->
+<!--        where f_id=#{id}-->
+<!--    </select>-->
+
+<!--    <delete id="deleteAll">-->
+<!--        delete from t_user-->
+<!--    </delete>-->
+
+<!--    <delete id="deleteUserInfoById">-->
+<!--        delete from t_user where-->
+<!--        id=#{id}-->
+<!--    </delete>-->
+
+<!--    <update id="updateUserInfo">-->
+<!--        update t_user set f_name =-->
+<!--        #{name} where f_id =-->
+<!--        #{id}-->
+<!--    </update>-->
+
+</mapper>

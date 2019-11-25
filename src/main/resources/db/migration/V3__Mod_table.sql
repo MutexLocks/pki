@@ -1,0 +1,1 @@
+alter table cert_serial_number modify id  integer auto_increment

@@ -1,6 +1,7 @@
 package com.g.pki.service.impl;
 
 
+import com.g.pki.dao.CertificateDao;
 import com.g.pki.service.CertificateService;
 import com.sun.org.apache.xml.internal.security.keys.keyresolver.implementations.X509SubjectNameResolver;
 import org.bouncycastle.asn1.pkcs.CertificationRequestInfo;
@@ -14,16 +15,21 @@ import org.bouncycastle.openssl.PEMReader;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import sun.misc.BASE64Decoder;
 
 import java.io.*;
 import java.math.BigInteger;
 import java.security.*;
 
+import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Hashtable;
@@ -32,6 +38,13 @@ import java.util.Vector;
 @Service
 public class CertificateServiceImpl implements CertificateService {
     private Logger LOG = LoggerFactory.getLogger(CertificateServiceImpl.class);
+    private CertificateDao certificateDao;
+    private String fileName;
+    @Autowired
+    public CertificateServiceImpl(CertificateDao certificateDao) {
+        this.certificateDao = certificateDao;
+    }
+
     /**
      *BouncyCastleProvider
      */
@@ -46,52 +59,95 @@ public class CertificateServiceImpl implements CertificateService {
      * @return
      */
 
-    private String issuerCSR = "-----BEGIN CERTIFICATE REQUEST-----\n" +
-            "MIICxzCCAa8CAQAwgYMxFzAVBgNVBAMMDid3d3cudGVzdC5jb20nMREwDwYDVQQKDAgnYW5oZW5nJzENMAsGA1UEBwwEJ2h6JzENMAsGA1UEBhMEJ0NOJzEZMBcGCSqGSIb3DQEJARYKJzFAcXEuY29tJzENMAsGA1UECwwEJ2RwJzENMAsGA1UECAwEJ2h6JzCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAI+6etMba7tLNJmEM1jtO+J+/goykNH5Xxy0SGSgBXyIvIbFThMcGCCs0RL6jiYH2iPzt17qjRUyMimOYZEoCZHxqrp/d2tgBCyVu3TjxR7L6JRj9WOS5+c+dYCPmj8Kk7nzaa3fTnXeATOhpotfkOArmM1OX3MpviCMmAOf2vYGULncmhLdD97GSXYldtKsTA51z6YSzN8WhCLeh3UHnQ3dEC1/98Hmamef7LqNsAtiVgR2B9UqL2YCuMQO0kxrD5+mq3To0KFoHOA78zvpYLE4Gq7mUjpixmwoWIlxQF3kjlc6VfA9LVjYrzfwpI+iGPYvz8/NXiyovxfvkF5v9vMCAwEAATANBgkqhkiG9w0BAQUFAAOCAQEAPL0AQDxqYrGayTGx7uLfNxPm9aTgITndbJyjA94WdFlW1DR3JUzVSzyIUbjv4uKVnedXRjVLvt8ksRpEK48kblsXNrniZovGs87CCb8SGbrBQiUr3XoedUWAIMMjaeUy1oc/T7Wnnhx/aHUxXzH2IPOi5e4UBGnS50YImZ+nsCfhJaLCm02IfZmXQYiaXMAAq4aa/sxGSUiKwZTMA5H3zG2ECDy3aMzxNpjPnNARGTF1in0EiTcp7wEVDbTfJrqTd3aqYEydyY/L/Dfv3d8gc9iI/bsMRCDRmG6sPT0pA+PqCOlG1V4lBS+EIgzGJckeTt/E5ZJa+cK0cBMm39pIgw==\n" +
-            "-----END CERTIFICATE REQUEST-----";
+    private String publicKey = //"-----BEGIN PUBLIC KEY-----\n" +
+            "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCRhS0DpWqGI20BUmRd+wSr9gFn\n" +
+            "HGFmkPBzuGCzscIRjDduhZO5JmAROxnF/98XM2E4SMaglm3scq1GR6+cHLLgiWIN\n" +
+            "EmGH/eAOFwiC380bFHRZZfkG8qgt2YznMBaJv6l9Cjs5Jp0q8aNaZOUi0x8K4p9S\n" +
+            "73veyePLDXQqw3uWvQIDAQAB\n" ;
+            //"-----END PUBLIC KEY-----";
+
+    private String privateKey = //"-----BEGIN RSA PRIVATE KEY-----\n" +
+            "MIICXAIBAAKBgQCRhS0DpWqGI20BUmRd+wSr9gFnHGFmkPBzuGCzscIRjDduhZO5\n" +
+            "JmAROxnF/98XM2E4SMaglm3scq1GR6+cHLLgiWINEmGH/eAOFwiC380bFHRZZfkG\n" +
+            "8qgt2YznMBaJv6l9Cjs5Jp0q8aNaZOUi0x8K4p9S73veyePLDXQqw3uWvQIDAQAB\n" +
+            "AoGAGq1l+7GjDjVHYgMnSD1g9V9zkWIYDxQKKMTH4Zl4YPwqG1Zcpwg8e1ww1OYc\n" +
+            "EWZHb+iTlVQOkdbSIjy5Gm7+cbeo3NuakkRK5S4VwQzMUh7h6C/6ocdPdJX72VUH\n" +
+            "iyeIrKKCZeSIgoJRVG4EVyYauUB6IaqNMtz6JNBzVEHq9IECQQCYPbYG+dXrsWMl\n" +
+            "UY+gn5yhixvRQNiHm6nJX6vLrV8d3a1adJ3drAhP9h8dzboJ4M5rdk2IEICUwBoQ\n" +
+            "tkLhMkj9AkEA9LLYQ98mD9BOxJuezb/g+IfHNYVg6GAIfbsk+q9p6fU6yQkGQB9n\n" +
+            "X52usYnT2OVwnIwAoI7/AGRwW/6Mb+nQwQJAfQgxtwj459mH095oV0K/IO1eqzzW\n" +
+            "mIj/qKMqNNzugVjORrv/606ehQ1eANw1LmezIA7JHjZvY7thrNgDlW/3AQJBAI4z\n" +
+            "JHSEyDSmZC/jE60TlaQ4G28h3IgNzsFqMPoxWAZqyUeso+I9nbA2DSAFLYQ9CW0f\n" +
+            "+vlTQCM1Owpq6afbo8ECQEzDQk+0pQj8QuvV+ikn8B+1TCRa0ZbY73Rfj1OkyBUc\n" +
+            "LkoR9Nd92fuh2mxxPWlXutklHBk99wWd0+dsTqPb2y0=\n" ;
+            //"-----END RSA PRIVATE KEY-----";
+
     @SuppressWarnings({"deprecation", "unchecked"})
 
-    public byte[] generateCert(String csrCode) {
+    public String generateCert(String csrCode) {
+
 
         X509Certificate cert = null;
         X509V3CertificateGenerator certGen = new X509V3CertificateGenerator();
-
         try {
-
+/*******************颁布者公私钥*******************************/
             // 生成RSA公私钥对
-            KeyPairGenerator kpg = null;
-            // 采用 RSA 非对称算法加密
-            kpg = KeyPairGenerator.getInstance("RSA");
-            // 初始化为2048 位
-            kpg.initialize(2048);
-            KeyPair keyPair = kpg.generateKeyPair();
+//            KeyPairGenerator kpg = null;
+//            // 采用 RSA 非对称算法加密
+//            kpg = KeyPairGenerator.getInstance("RSA");
+//            // 初始化为 2048 位
+//            kpg.initialize(2048);
+//            KeyPair keyPair = kpg.generateKeyPair();
             // 公钥
-            PublicKey pubKey = keyPair.getPublic();
+
+            PublicKey pubKey = getPublicKey(publicKey);
             // 私钥
-            PrivateKey priKey = keyPair.getPrivate();
+            PrivateKey priKey = getPrivateKey(privateKey);
             // 公钥
             certGen.setPublicKey(pubKey);
             // 设置序列号
-            certGen.setSerialNumber(new BigInteger("12345678"));
+            com.g.pki.model.Certificate certificate = new com.g.pki.model.Certificate();
+            certificateDao.generateCertSerialNumber(certificate);
+            certGen.setSerialNumber(new BigInteger(String.valueOf(certificate.getId())));
 
             // 设置颁发者信息
-//            Hashtable kwMapIssuer = new Hashtable();
-//
-//            Vector localVector = new Vector();
-//
-//            kwMapIssuer.put(X509Principal.C, "CN");
-//
-//            localVector.addElement(X509Principal.C);
-//
-//            kwMapIssuer.put(X509Principal.CN, "www.test.com");
-//
-//            localVector.addElement(X509Principal.CN);
-//
-//            kwMapIssuer.put(X509Principal.E, "111@qq.com");
-//
-//            localVector.addElement(X509Principal.E);
+            // 通用名称，ssl证书域名
+//            private String CN;
+//            // 组织/公司
+//            private String O;
+//            // 地理位置
+//            private String L;
+//            // 国名
+//            private String C;
+//            // hash算法
+//            private String hashAlgorithm;
+//            // 邮箱
+//            private String E;
+//            // 部门，单位
+//            private String OU;
+//            // 省份
+//            private String ST;
+            Hashtable kwMapIssuer = new Hashtable();
 
-            certGen.setIssuerDN(parseCSRtoX509(issuerCSR));
+            Vector localVector = new Vector();
+
+            kwMapIssuer.put(X509Principal.CN, "www.root.com");
+            kwMapIssuer.put(X509Principal.O, "xidian");
+            kwMapIssuer.put(X509Principal.L, "xian");
+            kwMapIssuer.put(X509Principal.C, "China");
+            kwMapIssuer.put(X509Principal.E, "123@qq.com");
+            kwMapIssuer.put(X509Principal.OU, "security");
+            kwMapIssuer.put(X509Principal.ST, "shanxi");
+
+            localVector.addElement(X509Principal.CN);
+            localVector.addElement(X509Principal.O);
+            localVector.addElement(X509Principal.L);
+            localVector.addElement(X509Principal.C);
+            localVector.addElement(X509Principal.E);
+            localVector.addElement(X509Principal.OU);
+            localVector.addElement(X509Principal.ST);
+            certGen.setIssuerDN(new X509Principal(localVector, kwMapIssuer));
+
             //  设置申请者信息
 
 //            @SuppressWarnings("rawtypes")
@@ -113,7 +169,10 @@ public class CertificateServiceImpl implements CertificateService {
 //            kwMapApplicant.put(X509Principal.E, "123@qq.com");
 //
 //            localVectorApplicant.addElement(X509Principal.E);
-            certGen.setSubjectDN(parseCSRtoX509(csrCode));
+            X509Name x509Name = parseCSRtoX509(csrCode);
+            Vector<String> CN = x509Name.getValues(X509Principal.CN);
+            fileName = CN.get(0);
+            certGen.setSubjectDN(x509Name);
 
             // 设置有效期
 
@@ -144,9 +203,9 @@ public class CertificateServiceImpl implements CertificateService {
         try {
             if (cert != null) {
                 writeFile(cert.getEncoded());
-                return cert.getEncoded();
+                // return cert.getEncoded();
             }
-            return null;
+            return fileName;
 
         } catch (CertificateEncodingException e) {
 
@@ -155,9 +214,24 @@ public class CertificateServiceImpl implements CertificateService {
             e.printStackTrace();
 
             return null;
-
         }
 
+    }
+    private static PublicKey getPublicKey(String key) throws Exception {
+        byte[] keyBytes;
+        keyBytes = (new BASE64Decoder()).decodeBuffer(key);
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(keyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        PublicKey publicKey = keyFactory.generatePublic(keySpec);
+        return publicKey;
+    }
+    private static PrivateKey getPrivateKey(String key) throws Exception {
+        byte[] keyBytes;
+        keyBytes = (new BASE64Decoder()).decodeBuffer(key);
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        PrivateKey privateKey = keyFactory.generatePrivate(keySpec);
+        return privateKey;
     }
 
     private X509Name parseCSRtoX509(String csrCode) throws IOException {
@@ -177,7 +251,6 @@ public class CertificateServiceImpl implements CertificateService {
         } else {
             CertificationRequestInfo certificationRequestInfo = csr.getCertificationRequestInfo();
             x509Name = certificationRequestInfo.getSubject();
-
             //System.out.println("x509Name is: " + x509Name + "\n");
         }
         return x509Name;
@@ -191,6 +264,7 @@ public class CertificateServiceImpl implements CertificateService {
 
     @Value("${cert.save.path}")
     private String certPath;
+
     private void writeFile(byte[] data) {
 
         if (data == null) {
@@ -203,7 +277,7 @@ public class CertificateServiceImpl implements CertificateService {
 
         try {
 
-            fop = new FileOutputStream(new File(certPath));
+            fop = new FileOutputStream(new File(certPath + fileName + ".cer"));
 
             fop.write(data);
 

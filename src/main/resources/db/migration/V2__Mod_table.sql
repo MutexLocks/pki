@@ -1,0 +1,1 @@
+alter table cert_serial_number add tmp varchar(1);
